@@ -15,6 +15,7 @@ param(
     [string]$OUTest = 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr',
     [string]$ServeurAD = 'intra.ght53.fr',
     [PSCredential]$IdentifiantsAD,
+    [string]$IdentifiantsADPath = '',
     [SecureString]$MotDePasseTemporaire,
     [switch]$DryRun
 )
@@ -26,6 +27,9 @@ function Confirm-Execution { if (Test-Simulation) { Write-Log 'Simulation : aucu
 Import-Module ActiveDirectory -ErrorAction Stop
 Write-Log "Serveur AD cible : $ServeurAD"
 $identiteCourante = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+if (-not $IdentifiantsAD -and $IdentifiantsADPath -and (Test-Path -LiteralPath $IdentifiantsADPath -PathType Leaf)) {
+    $IdentifiantsAD = Import-Clixml -LiteralPath $IdentifiantsADPath
+}
 $sessionIntra = ($identiteCourante -like 'INTRA\*' -or $identiteCourante -like "*@$DomaineUPN")
 Write-Log "Session Windows : $identiteCourante"
 if (-not $IdentifiantsAD -and -not (Test-Simulation) -and -not $sessionIntra) {

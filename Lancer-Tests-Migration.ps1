@@ -22,6 +22,39 @@ function Test-CompteIntra {
     param([string]$NomUtilisateur)
     $NomUtilisateur -match '^(INTRA\\.+|[^\\@]+@intra\.ght53\.fr)$'
 }
+function ConvertFrom-SecureStringToPlainText {
+    param([Security.SecureString]$SecureString)
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
+    try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+    finally {
+        if ($bstr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    }
+}
+function Test-IdentifiantsIntra {
+    param([PSCredential]$Credential)
+
+    if (-not $Credential) { return $false }
+    try {
+        Add-Type -AssemblyName System.DirectoryServices.AccountManagement -ErrorAction Stop
+        $nomUtilisateur = $Credential.UserName
+        if ($nomUtilisateur -like '*\*') { $nomUtilisateur = ($nomUtilisateur -split '\\',2)[1] }
+        elseif ($nomUtilisateur -like '*@*') { $nomUtilisateur = ($nomUtilisateur -split '@',2)[0] }
+
+        $motDePasse = ConvertFrom-SecureStringToPlainText $Credential.Password
+        $contexte = New-Object DirectoryServices.AccountManagement.PrincipalContext(
+            [DirectoryServices.AccountManagement.ContextType]::Domain,
+            'intra.ght53.fr'
+        )
+        $contexte.ValidateCredentials($nomUtilisateur, $motDePasse)
+    }
+    catch {
+        $false
+    }
+    finally {
+        $motDePasse = $null
+        if ($contexte) { $contexte.Dispose() }
+    }
+}
 
 $script:identifiantsExecution = $null
 do {
@@ -36,7 +69,18 @@ do {
         ) | Out-Null
         $script:identifiantsExecution = $null
     }
+    elseif (-not (Test-IdentifiantsIntra $script:identifiantsExecution)) {
+        [Windows.Forms.MessageBox]::Show(
+            "Authentification refusee par intra.ght53.fr. L interface ne peut pas demarrer avec ce compte.",
+            'Compte INTRA invalide',
+            'OK',
+            'Error'
+        ) | Out-Null
+        $script:identifiantsExecution = $null
+    }
 } until ($script:identifiantsExecution)
+$script:cheminIdentifiantsExecution = Join-Path $env:TEMP 'MigrationErnee-IdentifiantsIntra.clixml'
+$script:identifiantsExecution | Export-Clixml -LiteralPath $script:cheminIdentifiantsExecution
 
 function New-Definition {
     param(
@@ -110,9 +154,13 @@ $definitions = @{
     '06-Test-CreationBoiteExchange.ps1' = @(
         (New-Definition 'UtilisateurTest' 'Utilisateur AD' 'migration.test' "Identité Exchange de l'utilisateur."),
         (New-Definition 'AliasMessagerie' 'Alias messagerie' 'migration.test' 'Alias Exchange souhaité.'),
+        (New-Definition 'DomaineUPN' 'Domaine UPN' 'intra.ght53.fr' "Suffixe UPN utilisé si l'identité courte n'est pas trouvée."),
+        (New-Definition 'DomaineSMTP' 'Domaine SMTP' 'intra.ght53.fr' 'Domaine de l''adresse SMTP principale.'),
+        (New-Definition 'AdresseSMTPPrincipale' 'SMTP principale' '' 'Vide : alias@DomaineSMTP. Exemple : migration.test@intra.ght53.fr.' $false),
         (New-Definition 'BaseDeDonnees' 'Base Exchange' '' 'Vide : laisser Exchange sélectionner la base.' $false),
         (New-Definition 'ServeurExchange' 'Serveur Exchange' 'ght-exchangew-1' 'Nom du serveur Exchange pour importer une session distante.'),
-        (New-Definition 'UriPowerShellExchange' 'URI PowerShell' 'http://ght-exchangew-1/PowerShell/' 'URI PowerShell Exchange distante.')
+        (New-Definition 'UriPowerShellExchange' 'URI PowerShell' 'http://ght-exchangew-1/PowerShell/' 'URI PowerShell Exchange distante.'),
+        (New-Definition 'ControleurDomaineExchange' 'DC Exchange' '' 'Optionnel. Exemple : GHT-ADW-2.intra.ght53.fr.' $false)
     )
     '07-Test-ExportPST.ps1' = @(
         (New-Definition 'BoiteTest' 'Boîte à exporter' 'migration.test' 'Identité Exchange de la boîte.'),
@@ -485,6 +533,8 @@ $boutonExecuter.Add_Click({
     if ($scriptCharge -eq '08-Test-MigrationBoite.ps1' -and $caseRelancer.Checked) { $arguments += '-Relancer' }
     if ($scriptCharge -eq '10-Test-Robocopy.ps1' -and $caseSimulationRobocopy.Checked) { $arguments += '-Simulation' }
     if ($scriptCharge -eq '11-Test-MigrationMachineDomaine.ps1' -and $caseRedemarrer.Checked) { $arguments += '-Restart' }
+    if ($scriptCharge -eq '05-Test-CreationUtilisateurAD.ps1') { $arguments += @('-IdentifiantsADPath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
+    if ($scriptCharge -eq '06-Test-CreationBoiteExchange.ps1') { $arguments += @('-IdentifiantsExchangePath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
 
     try {
         $parametresProcessus = @{
@@ -492,7 +542,6 @@ $boutonExecuter.Add_Click({
             ArgumentList     = $arguments
             WorkingDirectory = $racineScripts
             WindowStyle      = 'Normal'
-            Credential       = $script:identifiantsExecution
             ErrorAction      = 'Stop'
         }
         Start-Process @parametresProcessus | Out-Null
@@ -505,5 +554,8 @@ $boutonExecuter.Add_Click({
 
 $form.AcceptButton = $boutonExecuter
 $form.CancelButton = $boutonFermer
+$form.Add_FormClosed({
+    Remove-Item -LiteralPath $script:cheminIdentifiantsExecution -Force -ErrorAction SilentlyContinue
+})
 Update-ListeScripts
 [void]$form.ShowDialog()
