@@ -15,14 +15,39 @@ param(
     [string]$UtilisateurTest = 'migration.test',
     [string]$AliasMessagerie = 'migration.test',
     [string]$BaseDeDonnees = '', # Vide = sélection automatique par Exchange
+    [string]$ServeurExchange = 'ght-exchangew-1',
+    [string]$UriPowerShellExchange = 'http://ght-exchangew-1/PowerShell/',
     [switch]$DryRun
 )
 
 function Write-Log { param([string]$Message,[string]$Niveau='INFO'); Write-Host ("[{0}] [{1}] {2}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'),$Niveau,$Message) }
 function Test-Simulation { [bool]($DryRun -or $WhatIfPreference) }
 function Confirm-Execution { if (Test-Simulation) { Write-Log 'Simulation : aucune modification ne sera effectuée.'; return }; if ((Read-Host "Tapez OUI pour activer la boîte Exchange de '$UtilisateurTest'") -cne 'OUI') { Write-Log 'Opération annulée.' 'ATTENTION'; exit 0 } }
+function Import-ExchangeSessionIfNeeded {
+    param(
+        [string[]]$CommandesAttendues,
+        [string]$ConnectionUri
+    )
 
-foreach ($commande in @('Get-Recipient','Get-User','Get-Mailbox','Enable-Mailbox')) {
+    $manquantes = @($CommandesAttendues | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) })
+    if ($manquantes.Count -eq 0) { return }
+
+    Write-Log ("Cmdlets Exchange absentes : {0}. Import de session distante..." -f ($manquantes -join ', ')) 'ATTENTION'
+    try {
+        $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $ConnectionUri -Authentication Kerberos -ErrorAction Stop
+    }
+    catch {
+        Write-Log "Connexion Kerberos implicite impossible : $($_.Exception.Message)" 'ATTENTION'
+        $identifiants = Get-Credential -Message "Compte Exchange/INTRA autorisé, ex: INTRA\admin ou admin@intra.ght53.fr"
+        $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri $ConnectionUri -Authentication Kerberos -Credential $identifiants -ErrorAction Stop
+    }
+    Import-PSSession $session -DisableNameChecking -AllowClobber -ErrorAction Stop | Out-Null
+    Write-Log "Session Exchange importée depuis $ConnectionUri." 'OK'
+}
+
+$commandesExchange = @('Get-Recipient','Get-User','Get-Mailbox','Enable-Mailbox')
+Import-ExchangeSessionIfNeeded -CommandesAttendues $commandesExchange -ConnectionUri $UriPowerShellExchange
+foreach ($commande in $commandesExchange) {
     if (-not (Get-Command $commande -ErrorAction SilentlyContinue)) { throw "Cmdlet '$commande' absente. Ouvrez l'Exchange Management Shell on-premise." }
 }
 

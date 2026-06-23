@@ -18,6 +18,26 @@ $racineScripts = $PSScriptRoot
 if (-not $racineScripts) { $racineScripts = Split-Path -Parent $MyInvocation.MyCommand.Path }
 $powershellExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
+function Test-CompteIntra {
+    param([string]$NomUtilisateur)
+    $NomUtilisateur -match '^(INTRA\\.+|[^\\@]+@intra\.ght53\.fr)$'
+}
+
+$script:identifiantsExecution = $null
+do {
+    $script:identifiantsExecution = Get-Credential -Message "Compte INTRA utilise pour lancer les scripts, ex: INTRA\admin ou admin@intra.ght53.fr"
+    if (-not $script:identifiantsExecution) { throw 'Compte INTRA obligatoire pour lancer l interface.' }
+    if (-not (Test-CompteIntra $script:identifiantsExecution.UserName)) {
+        [Windows.Forms.MessageBox]::Show(
+            "Le compte doit etre au format INTRA\compte ou compte@intra.ght53.fr.",
+            'Compte INTRA requis',
+            'OK',
+            'Warning'
+        ) | Out-Null
+        $script:identifiantsExecution = $null
+    }
+} until ($script:identifiantsExecution)
+
 function New-Definition {
     param(
         [string]$Nom,
@@ -84,12 +104,15 @@ $definitions = @{
         (New-Definition 'Nom' 'Nom' 'Migration' 'Nom du compte de test.'),
         (New-Definition 'Login' 'Login' 'migration.test' 'SamAccountName.' $true 'Login'),
         (New-Definition 'DomaineUPN' 'Domaine UPN' 'intra.ght53.fr' 'Suffixe UPN, sans @.'),
-        (New-Definition 'OUTest' 'OU de destination' 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr' "Distinguished Name complet de l'OU.")
+        (New-Definition 'OUTest' 'OU de destination' 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr' "Distinguished Name complet de l'OU."),
+        (New-Definition 'ServeurAD' 'Serveur AD' 'intra.ght53.fr' 'Nom DNS du domaine ou du contrôleur de domaine cible.')
     )
     '06-Test-CreationBoiteExchange.ps1' = @(
         (New-Definition 'UtilisateurTest' 'Utilisateur AD' 'migration.test' "Identité Exchange de l'utilisateur."),
         (New-Definition 'AliasMessagerie' 'Alias messagerie' 'migration.test' 'Alias Exchange souhaité.'),
-        (New-Definition 'BaseDeDonnees' 'Base Exchange' '' 'Vide : laisser Exchange sélectionner la base.' $false)
+        (New-Definition 'BaseDeDonnees' 'Base Exchange' '' 'Vide : laisser Exchange sélectionner la base.' $false),
+        (New-Definition 'ServeurExchange' 'Serveur Exchange' 'ght-exchangew-1' 'Nom du serveur Exchange pour importer une session distante.'),
+        (New-Definition 'UriPowerShellExchange' 'URI PowerShell' 'http://ght-exchangew-1/PowerShell/' 'URI PowerShell Exchange distante.')
     )
     '07-Test-ExportPST.ps1' = @(
         (New-Definition 'BoiteTest' 'Boîte à exporter' 'migration.test' 'Identité Exchange de la boîte.'),
@@ -124,7 +147,24 @@ $definitions = @{
 }
 
 function Get-ScriptsDisponibles {
-    @(Get-ChildItem -LiteralPath $racineScripts -Filter '*.ps1' -File | Where-Object Name -Match '^\d{2}-' | Sort-Object Name)
+    $ordreLogique = @(
+        '00-Verifications-Prerequis.ps1',
+        '04-Test-ScopeDHCP.ps1',
+        '11-Test-MigrationMachineDomaine.ps1',
+        '05-Test-CreationUtilisateurAD.ps1',
+        '01-Test-PartageFichiers.ps1',
+        '02-Test-ProfilItinerant.ps1',
+        '03-Test-Imprimante.ps1',
+        '10-Test-Robocopy.ps1',
+        '09-Test-RemapLecteur.ps1',
+        '07-Test-ExportPST.ps1',
+        '06-Test-CreationBoiteExchange.ps1',
+        '08-Test-MigrationBoite.ps1'
+    )
+    $scripts = @(Get-ChildItem -LiteralPath $racineScripts -Filter '*.ps1' -File | Where-Object Name -Match '^\d{2}-')
+    $rangParNom = @{}
+    for ($i = 0; $i -lt $ordreLogique.Count; $i++) { $rangParNom[$ordreLogique[$i]] = $i }
+    $scripts | Sort-Object @{ Expression = { if ($rangParNom.ContainsKey($_.Name)) { $rangParNom[$_.Name] } else { [int]::MaxValue } } }, Name
 }
 
 function ConvertTo-ArgumentNatif {
@@ -159,7 +199,7 @@ $titre.ForeColor = [Drawing.Color]::FromArgb(35,55,75)
 $form.Controls.Add($titre)
 
 $intro = New-Object Windows.Forms.Label
-$intro.Text = 'Toutes les valeurs sont modifiables ci-dessous. DryRun est sélectionné par défaut.'
+$intro.Text = "Toutes les valeurs sont modifiables ci-dessous. Scripts lances avec : $($script:identifiantsExecution.UserName)"
 $intro.Location = [Drawing.Point]::new(23,51)
 $intro.Size = [Drawing.Size]::new(900,24)
 $intro.ForeColor = [Drawing.Color]::DimGray
@@ -447,9 +487,17 @@ $boutonExecuter.Add_Click({
     if ($scriptCharge -eq '11-Test-MigrationMachineDomaine.ps1' -and $caseRedemarrer.Checked) { $arguments += '-Restart' }
 
     try {
-        Start-Process -FilePath $powershellExe -ArgumentList $arguments -WorkingDirectory $racineScripts -WindowStyle Normal -ErrorAction Stop | Out-Null
+        $parametresProcessus = @{
+            FilePath         = $powershellExe
+            ArgumentList     = $arguments
+            WorkingDirectory = $racineScripts
+            WindowStyle      = 'Normal'
+            Credential       = $script:identifiantsExecution
+            ErrorAction      = 'Stop'
+        }
+        Start-Process @parametresProcessus | Out-Null
         $mode = if ($radioDryRun.Checked) { 'DryRun' } else { 'RÉEL' }
-        $statut.Text = "$scriptCharge lancé en mode $mode. Consultez la nouvelle console."
+        $statut.Text = "$scriptCharge lancé en mode $mode avec $($script:identifiantsExecution.UserName)."
         $statut.ForeColor = if ($radioDryRun.Checked) { [Drawing.Color]::DarkGreen } else { [Drawing.Color]::DarkRed }
     }
     catch { [Windows.Forms.MessageBox]::Show("Impossible de lancer le script :`r`n$($_.Exception.Message)",'Erreur','OK','Error')|Out-Null }
