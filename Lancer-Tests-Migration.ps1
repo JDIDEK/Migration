@@ -42,6 +42,7 @@ $descriptions = @{
     '08-Test-MigrationBoite.ps1'         = 'Lance ou suit un déplacement Exchange cross-forest. Scénario alternatif au script 06.'
     '09-Test-RemapLecteur.ps1'           = 'Mappe un lecteur réseau persistant dans la session de la VM.'
     '10-Test-Robocopy.ps1'               = 'Copie les fichiers avec /COPYALL ou simule Robocopy avec /L.'
+    '11-Test-MigrationMachineDomaine.ps1' = 'Bascule une liste de machines du domaine ERNEE vers le domaine INTRA, avec log CSV.'
 }
 
 $definitions = @{
@@ -83,7 +84,7 @@ $definitions = @{
         (New-Definition 'Nom' 'Nom' 'Migration' 'Nom du compte de test.'),
         (New-Definition 'Login' 'Login' 'migration.test' 'SamAccountName.' $true 'Login'),
         (New-Definition 'DomaineUPN' 'Domaine UPN' 'intra.ght53.fr' 'Suffixe UPN, sans @.'),
-        (New-Definition 'OUTest' 'OU de destination' 'OU=Utilisateurs-Test,DC=intra,DC=ght53,DC=fr' "Distinguished Name complet de l'OU.")
+        (New-Definition 'OUTest' 'OU de destination' 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr' "Distinguished Name complet de l'OU.")
     )
     '06-Test-CreationBoiteExchange.ps1' = @(
         (New-Definition 'UtilisateurTest' 'Utilisateur AD' 'migration.test' "Identité Exchange de l'utilisateur."),
@@ -112,6 +113,13 @@ $definitions = @{
         (New-Definition 'DossierSource' 'Dossier source' 'C:\Migration-Test\Source' 'Petit jeu de fichiers de test.'),
         (New-Definition 'DossierDestination' 'Destination UNC' '\\SRV-FICHIERS-TEST\Migration-Test\Robocopy' 'Dossier cible de la copie.'),
         (New-Definition 'DossierLogs' 'Dossier des logs' 'C:\Migration-Test\Logs' 'Emplacement local des journaux Robocopy.')
+    )
+    '11-Test-MigrationMachineDomaine.ps1' = @(
+        (New-Definition 'ComputerListPath' 'Liste machines' '.\machines-test.txt' 'Fichier texte : une machine par ligne.'),
+        (New-Definition 'NewDomainFqdn' 'Domaine cible FQDN' 'intra.ght53.fr' 'Nom DNS complet du nouveau domaine.'),
+        (New-Definition 'OUPath' 'OU poste cible' 'OU=Postes,OU=HLER,DC=intra,DC=ght53,DC=fr' 'Distinguished Name complet de l''OU des postes.'),
+        (New-Definition 'LogPath' 'Log CSV' '.\migration-domaine-resultats.csv' 'Chemin du fichier CSV de resultat.'),
+        (New-Definition 'RestartDelaySeconds' 'Delai reboot' '30' 'Delai avant redemarrage automatique, en secondes.' $true 'Entier')
     )
 }
 
@@ -273,6 +281,14 @@ $caseSimulationRobocopy.Size = [Drawing.Size]::new(370,24)
 $caseSimulationRobocopy.Visible = $false
 $groupeConfiguration.Controls.Add($caseSimulationRobocopy)
 
+$caseRedemarrer = New-Object Windows.Forms.CheckBox
+$caseRedemarrer.Text = 'Redémarrer les machines après jonction au domaine'
+$caseRedemarrer.Location = [Drawing.Point]::new(15,287)
+$caseRedemarrer.Size = [Drawing.Size]::new(370,24)
+$caseRedemarrer.ForeColor = [Drawing.Color]::DarkRed
+$caseRedemarrer.Visible = $false
+$groupeConfiguration.Controls.Add($caseRedemarrer)
+
 $labelSaisieSecurisee = New-Object Windows.Forms.Label
 $labelSaisieSecurisee.Text = 'Les mots de passe et identifiants sont demandés dans la console ; ils ne sont jamais conservés ici.'
 $labelSaisieSecurisee.Location = [Drawing.Point]::new(15,287)
@@ -321,6 +337,7 @@ function Save-ConfigurationCourante {
         NePasAttendre = $caseNePasAttendre.Checked
         Relancer = $caseRelancer.Checked
         Simulation = $caseSimulationRobocopy.Checked
+        Redemarrer = $caseRedemarrer.Checked
     }
 }
 
@@ -331,6 +348,7 @@ function Show-Configuration {
     $caseNePasAttendre.Visible = $false
     $caseRelancer.Visible = $false
     $caseSimulationRobocopy.Visible = $false
+    $caseRedemarrer.Visible = $false
     $labelSaisieSecurisee.Visible = $true
     $caseValidation.Checked = $false
     if (-not $scriptCharge) { $texteDescription.Text='Aucun script disponible.'; $boutonExecuter.Enabled=$false; return }
@@ -347,10 +365,12 @@ function Show-Configuration {
     $caseNePasAttendre.Checked = [bool]($options -and $options.NePasAttendre)
     $caseRelancer.Checked = [bool]($options -and $options.Relancer)
     $caseSimulationRobocopy.Checked = [bool]($options -and $options.Simulation)
+    $caseRedemarrer.Checked = [bool]($options -and $options.Redemarrer)
     switch ($scriptCharge) {
         '07-Test-ExportPST.ps1' { $caseNePasAttendre.Visible=$true; $labelSaisieSecurisee.Visible=$false }
         '08-Test-MigrationBoite.ps1' { $caseRelancer.Visible=$true }
         '10-Test-Robocopy.ps1' { $caseSimulationRobocopy.Visible=$true; $labelSaisieSecurisee.Visible=$false }
+        '11-Test-MigrationMachineDomaine.ps1' { $caseRedemarrer.Visible=$true }
         '00-Verifications-Prerequis.ps1' { $labelSaisieSecurisee.Visible=$false }
         '01-Test-PartageFichiers.ps1' { $labelSaisieSecurisee.Visible=$false }
         '02-Test-ProfilItinerant.ps1' { $labelSaisieSecurisee.Visible=$false }
@@ -424,6 +444,7 @@ $boutonExecuter.Add_Click({
     if ($scriptCharge -eq '07-Test-ExportPST.ps1' -and $caseNePasAttendre.Checked) { $arguments += '-NePasAttendre' }
     if ($scriptCharge -eq '08-Test-MigrationBoite.ps1' -and $caseRelancer.Checked) { $arguments += '-Relancer' }
     if ($scriptCharge -eq '10-Test-Robocopy.ps1' -and $caseSimulationRobocopy.Checked) { $arguments += '-Simulation' }
+    if ($scriptCharge -eq '11-Test-MigrationMachineDomaine.ps1' -and $caseRedemarrer.Checked) { $arguments += '-Restart' }
 
     try {
         Start-Process -FilePath $powershellExe -ArgumentList $arguments -WorkingDirectory $racineScripts -WindowStyle Normal -ErrorAction Stop | Out-Null

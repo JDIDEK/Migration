@@ -12,7 +12,7 @@ param(
     [string]$Nom = 'Migration',
     [string]$Login = 'migration.test',
     [string]$DomaineUPN = 'intra.ght53.fr',
-    [string]$OUTest = 'OU=Utilisateurs-Test,DC=intra,DC=ght53,DC=fr',
+    [string]$OUTest = 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr',
     [SecureString]$MotDePasseTemporaire,
     [switch]$DryRun
 )
