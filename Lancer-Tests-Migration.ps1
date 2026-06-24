@@ -184,13 +184,13 @@ $definitions = @{
     '08-Test-Robocopy.ps1' = @(
         (New-Definition 'DossierSource' 'Dossier source' 'C:\Migration-Test\Source' 'Petit jeu de fichiers de test.'),
         (New-Definition 'DossierDestination' 'Destination UNC' '\\SRV-FICHIERS-TEST\Migration-Test\Robocopy' 'Dossier cible de la copie.'),
-        (New-Definition 'DossierLogs' 'Dossier des logs' 'C:\Migration-Test\Logs' 'Emplacement local des journaux Robocopy.')
+        (New-Definition 'DossierLogs' 'Dossier des logs' '.\Logs' 'Emplacement commun des journaux Robocopy.')
     )
     '02-Test-MigrationMachineDomaine.ps1' = @(
         (New-Definition 'ComputerListPath' 'Liste machines' '.\machines-test.txt' 'Fichier texte : une machine par ligne.'),
         (New-Definition 'NewDomainFqdn' 'Domaine cible FQDN' 'intra.ght53.fr' 'Nom DNS complet du nouveau domaine.'),
         (New-Definition 'OUPath' 'OU poste cible' 'OU=Postes,OU=HLER,DC=intra,DC=ght53,DC=fr' 'Distinguished Name complet de l''OU des postes.'),
-        (New-Definition 'LogPath' 'Log CSV' '.\migration-domaine-resultats.csv' 'Chemin du fichier CSV de resultat.'),
+        (New-Definition 'LogPath' 'Log CSV' '.\Logs\migration-domaine-resultats.csv' 'CSV optimisé pour une ouverture directe dans Excel.'),
         (New-Definition 'RestartDelaySeconds' 'Delai reboot' '30' 'Delai avant redemarrage automatique, en secondes.' $true 'Entier')
     )
     '03-MigrationUtilisateursAD.ps1' = @(
@@ -199,7 +199,7 @@ $definitions = @{
         (New-Definition 'ServeurADCible' 'AD cible' 'intra.ght53.fr' 'Domaine ou contrôleur de domaine cible.'),
         (New-Definition 'OUCible' 'OU cible' 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr' 'OU dans laquelle créer les comptes.'),
         (New-Definition 'DomaineUPNCible' 'UPN cible' 'intra.ght53.fr' 'Suffixe UPN des nouveaux comptes.'),
-        (New-Definition 'LogPath' 'Log CSV' '.\migration-utilisateurs-resultats.csv' 'Résultat détaillé de la migration.')
+        (New-Definition 'LogPath' 'Log CSV' '.\Logs\migration-utilisateurs-resultats.csv' 'CSV optimisé pour une ouverture directe dans Excel.')
     )
 }
 

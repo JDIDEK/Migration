@@ -13,7 +13,7 @@
 param(
     [string]$DossierSource = 'C:\Migration-Test\Source',
     [string]$DossierDestination = '\\SRV-FICHIERS-TEST\Migration-Test\Robocopy',
-    [string]$DossierLogs = 'C:\Migration-Test\Logs',
+    [string]$DossierLogs = '.\Logs',
     [switch]$DryRun,
     [switch]$Simulation
 )

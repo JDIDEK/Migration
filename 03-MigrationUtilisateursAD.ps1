@@ -18,7 +18,7 @@ param(
     [string]$ServeurADCible = 'intra.ght53.fr',
     [string]$OUCible = 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr',
     [string]$DomaineUPNCible = 'intra.ght53.fr',
-    [string]$LogPath = '.\migration-utilisateurs-resultats.csv',
+    [string]$LogPath = '.\Logs\migration-utilisateurs-resultats.csv',
     [PSCredential]$IdentifiantsSource,
     [PSCredential]$IdentifiantsCible,
     [string]$IdentifiantsCiblePath = '',
@@ -35,6 +35,17 @@ function Write-Log {
 
 function Test-Simulation {
     [bool]($DryRun -or $WhatIfPreference)
+}
+
+function Export-CsvPourExcel {
+    param(
+        [Parameter(Mandatory)][object[]]$Donnees,
+        [Parameter(Mandatory)][string]$Chemin
+    )
+
+    $lignes = @('sep=;') + @($Donnees | ConvertTo-Csv -NoTypeInformation -Delimiter ';')
+    $encodage = New-Object Text.UTF8Encoding($true)
+    [IO.File]::WriteAllLines([IO.Path]::GetFullPath($Chemin), [string[]]$lignes, $encodage)
 }
 
 function ConvertTo-NomCompte {
@@ -270,8 +281,21 @@ $dossierLog = Split-Path -Parent $LogPath
 if ($dossierLog -and -not (Test-Path -LiteralPath $dossierLog -PathType Container)) {
     New-Item -ItemType Directory -Path $dossierLog -Force | Out-Null
 }
-$resultats | Export-Csv -LiteralPath $LogPath -NoTypeInformation -Encoding UTF8
+$resultatsExcel = $resultats | Select-Object `
+    @{ Name = 'Identité source'; Expression = { $_.IdentiteSource } },
+    @{ Name = 'SamAccountName source'; Expression = { $_.SamAccountNameSource } },
+    @{ Name = 'Prénom'; Expression = { $_.Prenom } },
+    @{ Name = 'Nom'; Expression = { $_.Nom } },
+    @{ Name = 'SamAccountName cible'; Expression = { $_.SamAccountNameCible } },
+    @{ Name = 'UPN cible'; Expression = { $_.UserPrincipalName } },
+    @{ Name = 'Statut'; Expression = { $_.Statut } },
+    @{ Name = 'Erreur'; Expression = { $_.Erreur } },
+    @{ Name = 'Début'; Expression = { if ($_.Debut) { $_.Debut.ToString('dd/MM/yyyy HH:mm:ss') } } },
+    @{ Name = 'Fin'; Expression = { if ($_.Fin) { $_.Fin.ToString('dd/MM/yyyy HH:mm:ss') } } },
+    @{ Name = 'Durée (secondes)'; Expression = { if ($_.Debut -and $_.Fin) { [Math]::Round(($_.Fin - $_.Debut).TotalSeconds, 1) } } }
+
+Export-CsvPourExcel -Donnees @($resultatsExcel) -Chemin $LogPath
 
 Write-Host ''
 Write-Log "Traitement terminé. Log : $LogPath" 'OK'
-$resultats | Format-Table IdentiteSource,SamAccountNameCible,UserPrincipalName,Statut -AutoSize
+$resultatsExcel | Format-Table 'Identité source','SamAccountName cible','UPN cible','Statut' -AutoSize

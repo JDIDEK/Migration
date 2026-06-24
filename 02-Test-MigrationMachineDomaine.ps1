@@ -15,7 +15,7 @@ param(
     [string]$ComputerListPath = '.\machines-test.txt',
     [string]$NewDomainFqdn = 'intra.ght53.fr',
     [string]$OUPath = 'OU=Postes,OU=HLER,DC=intra,DC=ght53,DC=fr',
-    [string]$LogPath = '.\migration-domaine-resultats.csv',
+    [string]$LogPath = '.\Logs\migration-domaine-resultats.csv',
     [switch]$Restart,
     [switch]$DryRun,
     [int]$RestartDelaySeconds = 30
@@ -29,6 +29,17 @@ $LocalComputerName = $env:COMPUTERNAME.ToUpperInvariant()
 function Normalize-ComputerName {
     param([string]$Name)
     (($Name.Trim() -split '\.')[0]).ToUpperInvariant()
+}
+
+function Export-CsvPourExcel {
+    param(
+        [Parameter(Mandatory)][object[]]$Donnees,
+        [Parameter(Mandatory)][string]$Chemin
+    )
+
+    $lignes = @('sep=;') + @($Donnees | ConvertTo-Csv -NoTypeInformation -Delimiter ';')
+    $encodage = New-Object Text.UTF8Encoding($true)
+    [IO.File]::WriteAllLines([IO.Path]::GetFullPath($Chemin), [string[]]$lignes, $encodage)
 }
 
 if (-not (Test-Path -LiteralPath $ComputerListPath -PathType Leaf)) {
@@ -229,8 +240,20 @@ if ($logDirectory -and -not (Test-Path -LiteralPath $logDirectory -PathType Cont
     New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 }
 
-$Results | Export-Csv -Path $LogPath -NoTypeInformation -Encoding UTF8
+$resultatsExcel = $Results | Select-Object `
+    @{ Name = 'Machine demandée'; Expression = { $_.RequestedComputer } },
+    @{ Name = 'Machine détectée'; Expression = { $_.ReportedComputer } },
+    @{ Name = 'Domaine actuel'; Expression = { $_.CurrentDomain } },
+    @{ Name = 'Membre domaine'; Expression = { if ($_.PartOfDomain -eq $true) { 'Oui' } elseif ($_.PartOfDomain -eq $false) { 'Non' } else { '' } } },
+    @{ Name = 'Domaine cible'; Expression = { $_.TargetDomain } },
+    @{ Name = 'Statut'; Expression = { $_.Status } },
+    @{ Name = 'Erreur'; Expression = { $_.Error } },
+    @{ Name = 'Début'; Expression = { if ($_.StartedAt) { $_.StartedAt.ToString('dd/MM/yyyy HH:mm:ss') } } },
+    @{ Name = 'Fin'; Expression = { if ($_.FinishedAt) { $_.FinishedAt.ToString('dd/MM/yyyy HH:mm:ss') } } },
+    @{ Name = 'Durée (secondes)'; Expression = { if ($_.StartedAt -and $_.FinishedAt) { [Math]::Round(($_.FinishedAt - $_.StartedAt).TotalSeconds, 1) } } }
+
+Export-CsvPourExcel -Donnees @($resultatsExcel) -Chemin $LogPath
 
 Write-Host ''
 Write-Host "Termine. Log genere : $LogPath" -ForegroundColor Cyan
-$Results | Format-Table -AutoSize
+$resultatsExcel | Format-Table -AutoSize
