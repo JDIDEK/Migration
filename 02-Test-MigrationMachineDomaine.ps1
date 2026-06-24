@@ -38,7 +38,8 @@ function Export-CsvPourExcel {
     )
 
     $lignes = @('sep=;') + @($Donnees | ConvertTo-Csv -NoTypeInformation -Delimiter ';')
-    $encodage = New-Object Text.UTF8Encoding($true)
+    # Excel Windows détecte l'UTF-16 LE de façon fiable, même avec les paramètres régionaux français.
+    $encodage = [Text.Encoding]::Unicode
     [IO.File]::WriteAllLines([IO.Path]::GetFullPath($Chemin), [string[]]$lignes, $encodage)
 }
 

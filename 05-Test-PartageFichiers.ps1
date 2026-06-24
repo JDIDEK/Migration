@@ -3,15 +3,18 @@
 .SYNOPSIS
     Crée un dossier et un partage SMB de test avec des droits NTFS de modification.
 .PREREQUIS
-    Rôle Serveur de fichiers, module SmbShare, volume D:, droits administrateur
-    local et groupe AD de test déjà existant.
+    Rôle Serveur de fichiers, WinRM actif sur le serveur distant, module SmbShare,
+    droits administrateur sur le serveur et groupe AD de test déjà existant.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
+    [string]$ServeurFichiers = 'SRV-FICHIERS-TEST',
     [string]$CheminLocal = 'D:\Partages\Test',
     [string]$NomPartage = 'Migration-Test',
     [string]$DescriptionPartage = 'Partage de validation migration - TEST UNIQUEMENT',
     [string]$GroupeAD = 'INTRA\GG_Migration_Test_RW',
+    [PSCredential]$IdentifiantsServeur,
+    [string]$IdentifiantsServeurPath = '',
     [switch]$DryRun
 )
 
@@ -22,41 +25,82 @@ function Write-Log {
 function Test-Simulation { [bool]($DryRun -or $WhatIfPreference) }
 function Confirm-Execution {
     if (Test-Simulation) { Write-Log 'Simulation : aucune modification ne sera effectuée.'; return }
-    if ((Read-Host "Tapez OUI pour créer/configurer le dossier et le partage '$NomPartage'") -cne 'OUI') {
+    if ((Read-Host "Tapez OUI pour créer/configurer le partage '$NomPartage' sur '$ServeurFichiers'") -cne 'OUI') {
         Write-Log 'Opération annulée.' 'ATTENTION'; exit 0
     }
 }
-function Invoke-Change {
-    param([string]$Cible, [string]$Action, [scriptblock]$Commande)
-    if ($DryRun) { Write-Log "DRYRUN - $Action sur $Cible"; return }
-    if ($PSCmdlet.ShouldProcess($Cible, $Action)) { & $Commande }
+
+if (-not $IdentifiantsServeur -and $IdentifiantsServeurPath -and (Test-Path -LiteralPath $IdentifiantsServeurPath -PathType Leaf)) {
+    $IdentifiantsServeur = Import-Clixml -LiteralPath $IdentifiantsServeurPath
 }
 
-Import-Module SmbShare -ErrorAction Stop
-try { $null = ([Security.Principal.NTAccount]$GroupeAD).Translate([Security.Principal.SecurityIdentifier]) }
-catch { throw "Le groupe '$GroupeAD' est introuvable ou non résolu depuis ce serveur." }
+$nomServeurCourt = (($ServeurFichiers -split '\.')[0]).ToUpperInvariant()
+$executionLocale = $nomServeurCourt -in @('.', 'LOCALHOST', $env:COMPUTERNAME.ToUpperInvariant())
+if (-not $executionLocale -and -not $IdentifiantsServeur) {
+    $IdentifiantsServeur = Get-Credential -Message "Compte administrateur sur le serveur $ServeurFichiers"
+}
 
-$administrateurs = ([Security.Principal.SecurityIdentifier]'S-1-5-32-544').Translate([Security.Principal.NTAccount]).Value
 Confirm-Execution
 
-if (-not (Test-Path -LiteralPath $CheminLocal -PathType Container)) {
-    Invoke-Change $CheminLocal 'Créer le dossier' { New-Item -ItemType Directory -Path $CheminLocal -Force | Out-Null }
-}
-else { Write-Log "Dossier déjà présent : $CheminLocal" 'OK' }
+$configurationPartage = {
+    param(
+        [string]$CheminLocal,
+        [string]$NomPartage,
+        [string]$DescriptionPartage,
+        [string]$GroupeAD,
+        [bool]$Simulation
+    )
 
-$partage = Get-SmbShare -Name $NomPartage -ErrorAction SilentlyContinue
-if ($partage -and ([IO.Path]::GetFullPath($partage.Path) -ne [IO.Path]::GetFullPath($CheminLocal))) {
-    throw "Le partage '$NomPartage' existe déjà sur '$($partage.Path)'. Aucun changement n'a été fait sur ce partage."
-}
-if (-not $partage) {
-    Invoke-Change $NomPartage 'Créer le partage SMB' {
-        New-SmbShare -Name $NomPartage -Path $CheminLocal -Description $DescriptionPartage `
-            -FullAccess $administrateurs -ChangeAccess $GroupeAD | Out-Null
+    $ErrorActionPreference = 'Stop'
+    function New-Resultat {
+        param([string]$Niveau, [string]$Message)
+        [PSCustomObject]@{
+            Serveur = $env:COMPUTERNAME
+            Niveau  = $Niveau
+            Message = $Message
+        }
     }
-}
-else { Write-Log "Partage SMB déjà présent sur le bon chemin." 'OK' }
 
-if (-not (Test-Simulation) -and (Test-Path -LiteralPath $CheminLocal)) {
+    Import-Module SmbShare -ErrorAction Stop
+    try {
+        $null = ([Security.Principal.NTAccount]$GroupeAD).Translate([Security.Principal.SecurityIdentifier])
+    }
+    catch {
+        throw "Le groupe '$GroupeAD' est introuvable ou non résolu depuis $env:COMPUTERNAME."
+    }
+
+    $administrateurs = ([Security.Principal.SecurityIdentifier]'S-1-5-32-544').Translate(
+        [Security.Principal.NTAccount]
+    ).Value
+
+    if ($Simulation) {
+        New-Resultat 'INFO' "DRYRUN - Créer/vérifier '$CheminLocal'."
+        New-Resultat 'INFO' "DRYRUN - Créer/vérifier le partage '\\$env:COMPUTERNAME\$NomPartage'."
+        New-Resultat 'INFO' "DRYRUN - Accorder Modifier à '$GroupeAD' sur le partage et le dossier."
+        return
+    }
+
+    if (-not (Test-Path -LiteralPath $CheminLocal -PathType Container)) {
+        New-Item -ItemType Directory -Path $CheminLocal -Force | Out-Null
+        New-Resultat 'OK' "Dossier créé : $CheminLocal"
+    }
+    else {
+        New-Resultat 'OK' "Dossier déjà présent : $CheminLocal"
+    }
+
+    $partage = Get-SmbShare -Name $NomPartage -ErrorAction SilentlyContinue
+    if ($partage -and ([IO.Path]::GetFullPath($partage.Path) -ne [IO.Path]::GetFullPath($CheminLocal))) {
+        throw "Le partage '$NomPartage' existe déjà sur '$($partage.Path)'."
+    }
+    if (-not $partage) {
+        New-SmbShare -Name $NomPartage -Path $CheminLocal -Description $DescriptionPartage `
+            -FullAccess $administrateurs -ChangeAccess $GroupeAD -ErrorAction Stop | Out-Null
+        New-Resultat 'OK' "Partage créé : \\$env:COMPUTERNAME\$NomPartage"
+    }
+    else {
+        New-Resultat 'OK' "Partage déjà présent : \\$env:COMPUTERNAME\$NomPartage"
+    }
+
     $acl = Get-Acl -LiteralPath $CheminLocal
     $droitsSuffisants = $acl.Access | Where-Object {
         $_.IdentityReference.Value -eq $GroupeAD -and
@@ -66,27 +110,57 @@ if (-not (Test-Simulation) -and (Test-Path -LiteralPath $CheminLocal)) {
         (($_.InheritanceFlags -band [Security.AccessControl.InheritanceFlags]::ObjectInherit) -ne 0)
     }
     if (-not $droitsSuffisants) {
-        Invoke-Change $CheminLocal "Accorder les droits NTFS Modifier à $GroupeAD" {
-            $regle = New-Object Security.AccessControl.FileSystemAccessRule(
-                $GroupeAD, 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow'
-            )
-            $acl.AddAccessRule($regle) | Out-Null
-            Set-Acl -LiteralPath $CheminLocal -AclObject $acl
-        }
+        $regle = New-Object Security.AccessControl.FileSystemAccessRule(
+            $GroupeAD, 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow'
+        )
+        $acl.AddAccessRule($regle) | Out-Null
+        Set-Acl -LiteralPath $CheminLocal -AclObject $acl
+        New-Resultat 'OK' "Droits NTFS Modifier accordés à $GroupeAD."
     }
-    else { Write-Log 'Droits NTFS déjà présents.' 'OK' }
+    else {
+        New-Resultat 'OK' 'Droits NTFS déjà présents.'
+    }
 
     $droitPartage = Get-SmbShareAccess -Name $NomPartage -ErrorAction SilentlyContinue | Where-Object {
         $_.AccountName -eq $GroupeAD -and $_.AccessControlType -eq 'Allow' -and $_.AccessRight -in @('Change', 'Full')
     }
     if (-not $droitPartage) {
-        Invoke-Change $NomPartage "Accorder le droit de partage Modifier à $GroupeAD" {
-            Grant-SmbShareAccess -Name $NomPartage -AccountName $GroupeAD -AccessRight Change -Force | Out-Null
-        }
+        Grant-SmbShareAccess -Name $NomPartage -AccountName $GroupeAD -AccessRight Change -Force | Out-Null
+        New-Resultat 'OK' "Droit de partage Modifier accordé à $GroupeAD."
+    }
+    else {
+        New-Resultat 'OK' 'Droit de partage déjà présent.'
     }
 }
-elseif (Test-Simulation) {
-    Write-Log "DRYRUN - Vérifier/ajouter les droits NTFS Modifier et les droits de partage pour $GroupeAD."
+
+Write-Log "Serveur de fichiers : $ServeurFichiers"
+if ($executionLocale) {
+    $resultats = & $configurationPartage $CheminLocal $NomPartage $DescriptionPartage $GroupeAD ([bool](Test-Simulation))
+}
+else {
+    try {
+        Test-WSMan -ComputerName $ServeurFichiers -Credential $IdentifiantsServeur `
+            -Authentication Negotiate -ErrorAction Stop | Out-Null
+    }
+    catch {
+        throw "WinRM est inaccessible sur '$ServeurFichiers' : $($_.Exception.Message)"
+    }
+
+    try {
+        $resultats = Invoke-Command `
+            -ComputerName $ServeurFichiers `
+            -Credential $IdentifiantsServeur `
+            -Authentication Negotiate `
+            -ScriptBlock $configurationPartage `
+            -ArgumentList $CheminLocal,$NomPartage,$DescriptionPartage,$GroupeAD,([bool](Test-Simulation)) `
+            -ErrorAction Stop
+    }
+    catch {
+        throw "Échec de la configuration distante sur '$ServeurFichiers' : $($_.Exception.Message)"
+    }
 }
 
-Write-Log 'Contrôle du partage terminé.' 'OK'
+foreach ($resultat in @($resultats)) {
+    Write-Log "[$($resultat.Serveur)] $($resultat.Message)" $resultat.Niveau
+}
+Write-Log "Contrôle terminé. Chemin réseau : \\$ServeurFichiers\$NomPartage" 'OK'

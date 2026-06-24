@@ -116,6 +116,7 @@ $definitions = @{
         (New-Definition 'CommandesExchange' 'Cmdlets Exchange' 'Get-Mailbox;Enable-Mailbox;New-MailboxExportRequest;Get-MailboxExportRequest;New-MoveRequest;Get-MoveRequest' 'Séparer les noms par un point-virgule.')
     )
     '05-Test-PartageFichiers.ps1' = @(
+        (New-Definition 'ServeurFichiers' 'Serveur de fichiers' 'SRV-FICHIERS-TEST' 'Serveur Windows distant sur lequel créer le partage.'),
         (New-Definition 'CheminLocal' 'Chemin local' 'D:\Partages\Test' 'Dossier à créer sur le serveur de fichiers.'),
         (New-Definition 'NomPartage' 'Nom du partage' 'Migration-Test' 'Nom SMB sans barre oblique.'),
         (New-Definition 'DescriptionPartage' 'Description' 'Partage de validation migration - TEST UNIQUEMENT' 'Description visible dans la gestion des partages.'),
@@ -528,6 +529,7 @@ $boutonExecuter.Add_Click({
     if ($scriptCharge -eq '08-Test-Robocopy.ps1' -and $caseSimulationRobocopy.Checked) { $arguments += '-Simulation' }
     if ($scriptCharge -eq '02-Test-MigrationMachineDomaine.ps1' -and $caseRedemarrer.Checked) { $arguments += '-Restart' }
     if ($scriptCharge -eq '04-Test-CreationUtilisateurAD.ps1') { $arguments += @('-IdentifiantsADPath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
+    if ($scriptCharge -eq '05-Test-PartageFichiers.ps1') { $arguments += @('-IdentifiantsServeurPath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
     if ($scriptCharge -eq '10-Test-CreationBoiteExchange.ps1') { $arguments += @('-IdentifiantsExchangePath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
     if ($scriptCharge -eq '03-MigrationUtilisateursAD.ps1') { $arguments += @('-IdentifiantsCiblePath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
 
