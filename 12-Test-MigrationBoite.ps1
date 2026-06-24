@@ -8,7 +8,7 @@
     côté source, et le compte source doit avoir les droits de migration.
 .IMPORTANT
     « intra.ght53.fr » est le TargetDeliveryDomain, pas une destination suffisante
-    à lui seul. Renseignez également le FQDN Exchange/MRS Proxy source. Le script 06
+    à lui seul. Renseignez également le FQDN Exchange/MRS Proxy source. Le script 10
     et ce scénario cross-forest sont des scénarios alternatifs pour le même compte.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
@@ -37,7 +37,7 @@ foreach ($commande in @('Get-Recipient','Get-MoveRequest','Get-MoveRequestStatis
 }
 if ($ServeurExchangeSource -like '*ancien-domaine*') { Write-Log "Le FQDN source '$ServeurExchangeSource' ressemble à une valeur d'exemple : modifiez-le avant une exécution réelle." 'ATTENTION' }
 $destinataire = Get-Recipient -Identity $IdentiteCible -ErrorAction Stop
-if ($destinataire.RecipientTypeDetails -ne 'MailUser') { throw "L'objet cible doit être un MailUser pour un remote move ; type actuel : $($destinataire.RecipientTypeDetails). N'exécutez pas le script 06 avant ce scénario." }
+if ($destinataire.RecipientTypeDetails -ne 'MailUser') { throw "L'objet cible doit être un MailUser pour un remote move ; type actuel : $($destinataire.RecipientTypeDetails). N'exécutez pas le script 10 avant ce scénario." }
 
 $move = Get-MoveRequest -Identity $IdentiteCible -ErrorAction SilentlyContinue
 if ($move) {

@@ -8,7 +8,7 @@
     type de destinataire Exchange.
 .NOTE
     Ce script utilise Enable-Mailbox (et non New-Mailbox) afin de conserver
-    l'utilisateur AD créé par le script 05.
+    l'utilisateur AD créé par le script 04.
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(

@@ -1,0 +1,3 @@
+# Un SamAccountName ou UPN du domaine source par ligne.
+# Exemple :
+# jean.dupont

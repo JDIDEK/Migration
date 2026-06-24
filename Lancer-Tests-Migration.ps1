@@ -96,17 +96,18 @@ function New-Definition {
 
 $descriptions = @{
     '00-Verifications-Prerequis.ps1'    = 'Contrôle les modules Windows et les cmdlets Exchange. Lecture seule.'
-    '01-Test-PartageFichiers.ps1'       = 'Crée le dossier, le partage SMB et les permissions du groupe AD.'
-    '02-Test-ProfilItinerant.ps1'       = "Prépare le stockage du profil et configure le ProfilePath de l'utilisateur."
-    '03-Test-Imprimante.ps1'            = "Crée le port, le pilote et l'imprimante partagée de test."
-    '04-Test-ScopeDHCP.ps1'             = 'Crée un scope DHCP inactif et réserve une IP pour la VM locale.'
-    '05-Test-CreationUtilisateurAD.ps1' = "Crée l'utilisateur dans l'OU choisie. Le mot de passe est demandé dans la console."
-    '06-Test-CreationBoiteExchange.ps1' = "Active une boîte Exchange on-premise pour l'utilisateur AD."
-    '07-Test-ExportPST.ps1'              = "Exporte la boîte vers PST, suit l'avancement et nettoie la requête après succès."
-    '08-Test-MigrationBoite.ps1'         = 'Lance ou suit un déplacement Exchange cross-forest. Scénario alternatif au script 06.'
+    '01-Test-ScopeDHCP.ps1'             = 'Crée un scope DHCP inactif et réserve une IP pour la VM locale.'
+    '02-Test-MigrationMachineDomaine.ps1' = 'Bascule une liste de machines du domaine ERNEE vers le domaine INTRA, avec log CSV.'
+    '03-MigrationUtilisateursAD.ps1'    = 'Recrée une liste d utilisateurs dans INTRA avec un SamAccountName normalisé au format prenom.nom.'
+    '04-Test-CreationUtilisateurAD.ps1' = "Crée l'utilisateur dans l'OU choisie. Le mot de passe est demandé dans la console."
+    '05-Test-PartageFichiers.ps1'       = 'Crée le dossier, le partage SMB et les permissions du groupe AD.'
+    '06-Test-ProfilItinerant.ps1'       = "Prépare le stockage du profil et configure le ProfilePath de l'utilisateur."
+    '07-Test-Imprimante.ps1'            = "Crée le port, le pilote et l'imprimante partagée de test."
+    '08-Test-Robocopy.ps1'              = 'Copie les fichiers avec /COPYALL ou simule Robocopy avec /L.'
     '09-Test-RemapLecteur.ps1'           = 'Mappe un lecteur réseau persistant dans la session de la VM.'
-    '10-Test-Robocopy.ps1'               = 'Copie les fichiers avec /COPYALL ou simule Robocopy avec /L.'
-    '11-Test-MigrationMachineDomaine.ps1' = 'Bascule une liste de machines du domaine ERNEE vers le domaine INTRA, avec log CSV.'
+    '10-Test-CreationBoiteExchange.ps1' = "Active une boîte Exchange on-premise pour l'utilisateur AD."
+    '11-Test-ExportPST.ps1'             = "Exporte la boîte vers PST, suit l'avancement et nettoie la requête après succès."
+    '12-Test-MigrationBoite.ps1'        = 'Lance ou suit un déplacement Exchange cross-forest. Scénario alternatif au script 10.'
 }
 
 $definitions = @{
@@ -114,26 +115,26 @@ $definitions = @{
         (New-Definition 'ModulesRequis' 'Modules requis' 'ActiveDirectory;DhcpServer;PrintManagement;SmbShare' 'Séparer les noms par un point-virgule.'),
         (New-Definition 'CommandesExchange' 'Cmdlets Exchange' 'Get-Mailbox;Enable-Mailbox;New-MailboxExportRequest;Get-MailboxExportRequest;New-MoveRequest;Get-MoveRequest' 'Séparer les noms par un point-virgule.')
     )
-    '01-Test-PartageFichiers.ps1' = @(
+    '05-Test-PartageFichiers.ps1' = @(
         (New-Definition 'CheminLocal' 'Chemin local' 'D:\Partages\Test' 'Dossier à créer sur le serveur de fichiers.'),
         (New-Definition 'NomPartage' 'Nom du partage' 'Migration-Test' 'Nom SMB sans barre oblique.'),
         (New-Definition 'DescriptionPartage' 'Description' 'Partage de validation migration - TEST UNIQUEMENT' 'Description visible dans la gestion des partages.'),
         (New-Definition 'GroupeAD' 'Groupe AD RW' 'INTRA\GG_Migration_Test_RW' 'Format DOMAINE\Groupe.')
     )
-    '02-Test-ProfilItinerant.ps1' = @(
+    '06-Test-ProfilItinerant.ps1' = @(
         (New-Definition 'UtilisateurTest' 'Utilisateur AD' 'migration.test' "SamAccountName de l'utilisateur."),
         (New-Definition 'ServeurFichiers' 'Serveur de fichiers' 'SRV-FICHIERS-TEST' 'Nom DNS utilisé pour construire le chemin UNC.'),
         (New-Definition 'RacineLocaleProfils' 'Racine locale' 'D:\Profils-Test' 'Dossier local sur le serveur de fichiers.'),
         (New-Definition 'NomPartageProfils' 'Partage profils' 'Profils-Test$' 'Nom du partage SMB, éventuellement caché avec $.')
     )
-    '03-Test-Imprimante.ps1' = @(
+    '07-Test-Imprimante.ps1' = @(
         (New-Definition 'NomPort' 'Nom du port' 'IP_TEST_192.0.2.10' 'Nom du port TCP/IP.'),
         (New-Definition 'AdresseIPTest' 'Adresse IP' '192.0.2.10' 'Adresse documentaire ou adresse de test.'),
         (New-Definition 'NomPilote' 'Pilote' 'Generic / Text Only' 'Nom exact du pilote installé ou présent dans le magasin.'),
         (New-Definition 'NomImprimante' 'Nom imprimante' 'Imprimante-Migration-Test' "Nom local de la file d'impression."),
         (New-Definition 'NomPartage' 'Nom du partage' 'IMP-Migration-Test' "Nom réseau de l'imprimante partagée.")
     )
-    '04-Test-ScopeDHCP.ps1' = @(
+    '01-Test-ScopeDHCP.ps1' = @(
         (New-Definition 'ServeurDHCP' 'Serveur DHCP' 'SRV-DHCP-TEST' 'Nom DNS du serveur DHCP.'),
         (New-Definition 'NomScope' 'Nom du scope' 'TEST-MIGRATION-192.168.99.0' 'Libellé clairement identifié comme test.'),
         (New-Definition 'ScopeId' 'ID du scope' '192.168.99.0' 'Adresse réseau du scope.'),
@@ -143,7 +144,7 @@ $definitions = @{
         (New-Definition 'IPReserveeVM' 'IP réservée VM' '192.168.99.110' 'Adresse de réservation comprise dans le scope.'),
         (New-Definition 'NomCarteReseau' 'Carte réseau VM' '' "Vide : détecter l'unique carte active." $false)
     )
-    '05-Test-CreationUtilisateurAD.ps1' = @(
+    '04-Test-CreationUtilisateurAD.ps1' = @(
         (New-Definition 'Prenom' 'Prénom' 'Jean' 'Prénom du compte de test.'),
         (New-Definition 'Nom' 'Nom' 'Migration' 'Nom du compte de test.'),
         (New-Definition 'Login' 'Login' 'migration.test' 'SamAccountName.' $true 'Login'),
@@ -151,7 +152,7 @@ $definitions = @{
         (New-Definition 'OUTest' 'OU de destination' 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr' "Distinguished Name complet de l'OU."),
         (New-Definition 'ServeurAD' 'Serveur AD' 'intra.ght53.fr' 'Nom DNS du domaine ou du contrôleur de domaine cible.')
     )
-    '06-Test-CreationBoiteExchange.ps1' = @(
+    '10-Test-CreationBoiteExchange.ps1' = @(
         (New-Definition 'UtilisateurTest' 'Utilisateur AD' 'migration.test' "Identité Exchange de l'utilisateur."),
         (New-Definition 'AliasMessagerie' 'Alias messagerie' 'migration.test' 'Alias Exchange souhaité.'),
         (New-Definition 'DomaineUPN' 'Domaine UPN' 'intra.ght53.fr' "Suffixe UPN utilisé si l'identité courte n'est pas trouvée."),
@@ -162,7 +163,7 @@ $definitions = @{
         (New-Definition 'UriPowerShellExchange' 'URI PowerShell' 'http://ght-exchangew-1/PowerShell/' 'URI PowerShell Exchange distante.'),
         (New-Definition 'ControleurDomaineExchange' 'DC Exchange' '' 'Optionnel. Exemple : GHT-ADW-2.intra.ght53.fr.' $false)
     )
-    '07-Test-ExportPST.ps1' = @(
+    '11-Test-ExportPST.ps1' = @(
         (New-Definition 'BoiteTest' 'Boîte à exporter' 'migration.test' 'Identité Exchange de la boîte.'),
         (New-Definition 'DossierPST' 'Dossier PST UNC' '\\SRV-FICHIERS-TEST\PST-Test$' 'Chemin UNC accessible par Exchange Trusted Subsystem.'),
         (New-Definition 'NomFichierPST' 'Nom du PST' 'migration.test.pst' 'Nom de fichier avec extension .pst.'),
@@ -170,7 +171,7 @@ $definitions = @{
         (New-Definition 'IntervalleSecondes' 'Intervalle (secondes)' '15' 'Fréquence du suivi, de 1 à 3600.' $true 'Entier'),
         (New-Definition 'DelaiMaximumMinutes' 'Délai maximal (minutes)' '120' 'Délai de suivi, de 1 à 1440.' $true 'Entier')
     )
-    '08-Test-MigrationBoite.ps1' = @(
+    '12-Test-MigrationBoite.ps1' = @(
         (New-Definition 'IdentiteCible' 'Identité cible' 'migration.test@intra.ght53.fr' 'MailUser préparé dans la forêt cible.'),
         (New-Definition 'ServeurExchangeSource' 'MRS Proxy source' 'exchange-source.ancien-domaine.local' 'FQDN Exchange/MRS Proxy réel de la source.'),
         (New-Definition 'DomaineLivraisonCible' 'Domaine cible' 'intra.ght53.fr' 'TargetDeliveryDomain du déplacement.'),
@@ -180,39 +181,32 @@ $definitions = @{
         (New-Definition 'LettreLecteur' 'Lettre du lecteur' 'Z' 'Une lettre de A à Z, avec ou sans deux-points.'),
         (New-Definition 'CheminUNC' 'Chemin UNC' '\\SRV-FICHIERS-TEST\Migration-Test' 'Partage réseau à mapper.')
     )
-    '10-Test-Robocopy.ps1' = @(
+    '08-Test-Robocopy.ps1' = @(
         (New-Definition 'DossierSource' 'Dossier source' 'C:\Migration-Test\Source' 'Petit jeu de fichiers de test.'),
         (New-Definition 'DossierDestination' 'Destination UNC' '\\SRV-FICHIERS-TEST\Migration-Test\Robocopy' 'Dossier cible de la copie.'),
         (New-Definition 'DossierLogs' 'Dossier des logs' 'C:\Migration-Test\Logs' 'Emplacement local des journaux Robocopy.')
     )
-    '11-Test-MigrationMachineDomaine.ps1' = @(
+    '02-Test-MigrationMachineDomaine.ps1' = @(
         (New-Definition 'ComputerListPath' 'Liste machines' '.\machines-test.txt' 'Fichier texte : une machine par ligne.'),
         (New-Definition 'NewDomainFqdn' 'Domaine cible FQDN' 'intra.ght53.fr' 'Nom DNS complet du nouveau domaine.'),
         (New-Definition 'OUPath' 'OU poste cible' 'OU=Postes,OU=HLER,DC=intra,DC=ght53,DC=fr' 'Distinguished Name complet de l''OU des postes.'),
         (New-Definition 'LogPath' 'Log CSV' '.\migration-domaine-resultats.csv' 'Chemin du fichier CSV de resultat.'),
         (New-Definition 'RestartDelaySeconds' 'Delai reboot' '30' 'Delai avant redemarrage automatique, en secondes.' $true 'Entier')
     )
+    '03-MigrationUtilisateursAD.ps1' = @(
+        (New-Definition 'ListeUtilisateursPath' 'Liste utilisateurs' '.\utilisateurs-migration.txt' 'Un SamAccountName ou UPN source par ligne.'),
+        (New-Definition 'ServeurADSource' 'AD source' 'ernee.local' 'Domaine ou contrôleur de domaine source.'),
+        (New-Definition 'ServeurADCible' 'AD cible' 'intra.ght53.fr' 'Domaine ou contrôleur de domaine cible.'),
+        (New-Definition 'OUCible' 'OU cible' 'OU=Utilisateurs,OU=HLER,DC=intra,DC=ght53,DC=fr' 'OU dans laquelle créer les comptes.'),
+        (New-Definition 'DomaineUPNCible' 'UPN cible' 'intra.ght53.fr' 'Suffixe UPN des nouveaux comptes.'),
+        (New-Definition 'LogPath' 'Log CSV' '.\migration-utilisateurs-resultats.csv' 'Résultat détaillé de la migration.')
+    )
 }
 
 function Get-ScriptsDisponibles {
-    $ordreLogique = @(
-        '00-Verifications-Prerequis.ps1',
-        '04-Test-ScopeDHCP.ps1',
-        '11-Test-MigrationMachineDomaine.ps1',
-        '05-Test-CreationUtilisateurAD.ps1',
-        '01-Test-PartageFichiers.ps1',
-        '02-Test-ProfilItinerant.ps1',
-        '03-Test-Imprimante.ps1',
-        '10-Test-Robocopy.ps1',
-        '09-Test-RemapLecteur.ps1',
-        '07-Test-ExportPST.ps1',
-        '06-Test-CreationBoiteExchange.ps1',
-        '08-Test-MigrationBoite.ps1'
-    )
-    $scripts = @(Get-ChildItem -LiteralPath $racineScripts -Filter '*.ps1' -File | Where-Object Name -Match '^\d{2}-')
-    $rangParNom = @{}
-    for ($i = 0; $i -lt $ordreLogique.Count; $i++) { $rangParNom[$ordreLogique[$i]] = $i }
-    $scripts | Sort-Object @{ Expression = { if ($rangParNom.ContainsKey($_.Name)) { $rangParNom[$_.Name] } else { [int]::MaxValue } } }, Name
+    @(Get-ChildItem -LiteralPath $racineScripts -Filter '*.ps1' -File |
+        Where-Object Name -Match '^\d{2}-' |
+        Sort-Object Name)
 }
 
 function ConvertTo-ArgumentNatif {
@@ -455,15 +449,15 @@ function Show-Configuration {
     $caseSimulationRobocopy.Checked = [bool]($options -and $options.Simulation)
     $caseRedemarrer.Checked = [bool]($options -and $options.Redemarrer)
     switch ($scriptCharge) {
-        '07-Test-ExportPST.ps1' { $caseNePasAttendre.Visible=$true; $labelSaisieSecurisee.Visible=$false }
-        '08-Test-MigrationBoite.ps1' { $caseRelancer.Visible=$true }
-        '10-Test-Robocopy.ps1' { $caseSimulationRobocopy.Visible=$true; $labelSaisieSecurisee.Visible=$false }
-        '11-Test-MigrationMachineDomaine.ps1' { $caseRedemarrer.Visible=$true }
+        '11-Test-ExportPST.ps1' { $caseNePasAttendre.Visible=$true; $labelSaisieSecurisee.Visible=$false }
+        '12-Test-MigrationBoite.ps1' { $caseRelancer.Visible=$true }
+        '08-Test-Robocopy.ps1' { $caseSimulationRobocopy.Visible=$true; $labelSaisieSecurisee.Visible=$false }
+        '02-Test-MigrationMachineDomaine.ps1' { $caseRedemarrer.Visible=$true }
         '00-Verifications-Prerequis.ps1' { $labelSaisieSecurisee.Visible=$false }
-        '01-Test-PartageFichiers.ps1' { $labelSaisieSecurisee.Visible=$false }
-        '02-Test-ProfilItinerant.ps1' { $labelSaisieSecurisee.Visible=$false }
-        '03-Test-Imprimante.ps1' { $labelSaisieSecurisee.Visible=$false }
-        '04-Test-ScopeDHCP.ps1' { $labelSaisieSecurisee.Visible=$false }
+        '01-Test-ScopeDHCP.ps1' { $labelSaisieSecurisee.Visible=$false }
+        '05-Test-PartageFichiers.ps1' { $labelSaisieSecurisee.Visible=$false }
+        '06-Test-ProfilItinerant.ps1' { $labelSaisieSecurisee.Visible=$false }
+        '07-Test-Imprimante.ps1' { $labelSaisieSecurisee.Visible=$false }
         '09-Test-RemapLecteur.ps1' { $labelSaisieSecurisee.Visible=$false }
     }
 }
@@ -529,12 +523,13 @@ $boutonExecuter.Add_Click({
 
     $arguments = @('-NoProfile','-NoExit','-File',(ConvertTo-ArgumentNatif $script)) + $configurationArguments
     if ($radioDryRun.Checked) { $arguments += '-DryRun' }
-    if ($scriptCharge -eq '07-Test-ExportPST.ps1' -and $caseNePasAttendre.Checked) { $arguments += '-NePasAttendre' }
-    if ($scriptCharge -eq '08-Test-MigrationBoite.ps1' -and $caseRelancer.Checked) { $arguments += '-Relancer' }
-    if ($scriptCharge -eq '10-Test-Robocopy.ps1' -and $caseSimulationRobocopy.Checked) { $arguments += '-Simulation' }
-    if ($scriptCharge -eq '11-Test-MigrationMachineDomaine.ps1' -and $caseRedemarrer.Checked) { $arguments += '-Restart' }
-    if ($scriptCharge -eq '05-Test-CreationUtilisateurAD.ps1') { $arguments += @('-IdentifiantsADPath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
-    if ($scriptCharge -eq '06-Test-CreationBoiteExchange.ps1') { $arguments += @('-IdentifiantsExchangePath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
+    if ($scriptCharge -eq '11-Test-ExportPST.ps1' -and $caseNePasAttendre.Checked) { $arguments += '-NePasAttendre' }
+    if ($scriptCharge -eq '12-Test-MigrationBoite.ps1' -and $caseRelancer.Checked) { $arguments += '-Relancer' }
+    if ($scriptCharge -eq '08-Test-Robocopy.ps1' -and $caseSimulationRobocopy.Checked) { $arguments += '-Simulation' }
+    if ($scriptCharge -eq '02-Test-MigrationMachineDomaine.ps1' -and $caseRedemarrer.Checked) { $arguments += '-Restart' }
+    if ($scriptCharge -eq '04-Test-CreationUtilisateurAD.ps1') { $arguments += @('-IdentifiantsADPath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
+    if ($scriptCharge -eq '10-Test-CreationBoiteExchange.ps1') { $arguments += @('-IdentifiantsExchangePath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
+    if ($scriptCharge -eq '03-MigrationUtilisateursAD.ps1') { $arguments += @('-IdentifiantsCiblePath',(ConvertTo-ArgumentNatif $script:cheminIdentifiantsExecution)) }
 
     try {
         $parametresProcessus = @{
